@@ -2,6 +2,7 @@ import {
   chmod,
   mkdir,
   readFile,
+  rename,
   rm,
   symlink,
   writeFile,
@@ -53,6 +54,29 @@ it.each(["after", "before"] as const)(
     });
   },
 );
+
+it("treats a parent turned into a regular file as a deletion in the final snapshot (#3238)", async () => {
+  const root = await createTestTempDirectory("rea-fs-enotdir-");
+  await mkdir(join(root, "reports"));
+  await writeFile(join(root, "reports", "final.json"), '{"result":42}\n');
+  const scenario = parseProcessScenario({
+    executable: process.execPath,
+    working_directory: root,
+    filesystem_observation_paths: [join(root, "reports", "final.json")],
+  });
+  const before = await snapshotRoots(scenario);
+  await rename(join(root, "reports"), join(root, "saved-reports"));
+  await writeFile(join(root, "reports"), "regular file");
+  // The initial snapshot still fails: a selected path that never resolved
+  // is a caller error, not a deletion.
+  await expect(snapshotRoots(scenario)).rejects.toThrow(/ENOTDIR/);
+  const after = await snapshotRoots(scenario, undefined, ["ENOENT", "ENOTDIR"]);
+  expect(
+    classifyFilesystemEffects(before, after).find(
+      ({ path }) => path === "root_0:.",
+    ),
+  ).toMatchObject({ status: "deleted", after: null });
+});
 
 it("preserves proven deletion in an exhausted root while another root is partial", async () => {
   const root = await createTestTempDirectory("rea-fs-multiple-roots-");

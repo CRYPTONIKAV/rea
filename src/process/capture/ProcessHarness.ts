@@ -502,7 +502,14 @@ const completeCapture = async (options: {
   assertNotCancelled(options.signal);
   let after: Awaited<ReturnType<typeof snapshotRoots>>;
   try {
-    after = await options.captureSnapshot(scenario, options.signal);
+    // The final snapshot races the child: a selected path that existed at
+    // capture start may be unreachable now. Like a rename (ENOENT), a parent
+    // turned into a regular file (ENOTDIR) means the descendant is absent,
+    // not a capture failure (#3238). Other lookup failures keep failing.
+    after = await options.captureSnapshot(scenario, options.signal, [
+      "ENOENT",
+      "ENOTDIR",
+    ]);
   } catch (cause: unknown) {
     options.observationBuffer.filesystem_snapshots = {
       ...options.observationBuffer.filesystem_snapshots,

@@ -47,11 +47,19 @@ const fileUnavailableSystemCode = (cause: unknown): string | undefined => {
     : undefined;
 };
 
-const lstatIfPresent = async (path: string): Promise<Stats | undefined> => {
+const lstatIfPresent = async (
+  path: string,
+  absentCodes: readonly string[] = ["ENOENT"],
+): Promise<Stats | undefined> => {
   try {
     return await lstat(path);
   } catch (cause: unknown) {
-    if (cause instanceof Error && "code" in cause && cause.code === "ENOENT")
+    if (
+      cause instanceof Error &&
+      "code" in cause &&
+      typeof cause.code === "string" &&
+      absentCodes.includes(cause.code)
+    )
       return undefined;
     throw cause;
   }
@@ -169,6 +177,7 @@ export const hashFile = async (
 export const snapshotRoots = async (
   scenario: ProcessScenario,
   signal?: AbortSignal,
+  absentCodes: readonly string[] = ["ENOENT"],
 ): Promise<ProcessFilesystemSnapshot> => {
   const entries: FileState[] = [];
   const completeRoots: string[] = [];
@@ -198,7 +207,7 @@ export const snapshotRoots = async (
         enumerationReasons.add("depth_limit");
       return false;
     }
-    const stats = await lstatIfPresent(path);
+    const stats = await lstatIfPresent(path, absentCodes);
     if (stats === undefined) return true;
     const relativePath = relative(root, path) || ".";
     if (stats.isSymbolicLink()) {
@@ -326,7 +335,7 @@ export const snapshotRoots = async (
   };
   for (const [index, root] of scenario.filesystem_observation_paths.entries()) {
     const alias = `root_${String(index)}`;
-    if ((await lstatIfPresent(root)) === undefined) {
+    if ((await lstatIfPresent(root, absentCodes)) === undefined) {
       completeRoots.push(alias);
       continue;
     }
