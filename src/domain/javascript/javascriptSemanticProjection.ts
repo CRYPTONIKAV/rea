@@ -818,11 +818,16 @@ const declarationNames = (declaration: t.Declaration): string[] => {
 
 const defaultDeclarationName = (
   declaration: t.ExportDefaultDeclaration["declaration"],
-): string | null =>
-  (t.isFunctionDeclaration(declaration) || t.isClassDeclaration(declaration)) &&
-  t.isIdentifier(declaration.id)
+): string | null => {
+  // A bare identifier keeps its lexical binding so the resolver can follow
+  // it to the initializer (#3261); other expressions have no binding.
+  if (t.isIdentifier(declaration)) return declaration.name;
+  return (t.isFunctionDeclaration(declaration) ||
+    t.isClassDeclaration(declaration)) &&
+    t.isIdentifier(declaration.id)
     ? declaration.id.name
     : null;
+};
 
 const commonJsExportName = (
   node: t.Node,

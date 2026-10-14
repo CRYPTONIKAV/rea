@@ -7,6 +7,20 @@ import {
   topLevelBinding,
 } from "./javascriptSemanticAnalysis.fixture.js";
 
+describe("JavaScript semantic analysis: identifier default exports", () => {
+  it("retains the lexical binding of an identifier default export (#3261)", () => {
+    const ir = analyzeJavaScriptSemantics(`
+      const run = () => ({ answer: 42 });
+      export default run;
+    `);
+    const link = ir.moduleLinks.find(
+      ({ exportedName }) => exportedName === "default",
+    );
+    expect(link?.localName).toBe("run");
+    expect(link?.callableId).not.toBeNull();
+  });
+});
+
 describe("JavaScript semantic analysis: calls 1", () => {
   it("does not assign computed method-name reads to method closures", () => {
     const ir = analyzeJavaScriptSemantics(`
